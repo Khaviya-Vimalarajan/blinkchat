@@ -1,3 +1,70 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@property --border-angle {
+  inherits: false;
+  initial-value: 0deg;
+  syntax: "<angle>";
+}
+
+.input {
+  @apply w-full bg-purple-900/50 border border-purple-700 rounded-lg py-2 pl-10 pr-4 text-purple-100 placeholder-purple-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent;
+}
+
+.auth-input-icon {
+  @apply absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 size-5;
+}
+
+.auth-input-label {
+  @apply block text-sm font-medium text-purple-200 mb-2;
+}
+
+.auth-badge {
+  @apply inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-purple-500/20 text-purple-300;
+}
+
+.auth-btn {
+  @apply w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg py-2.5 font-medium hover:from-purple-700 hover:to-pink-700 transition-all;
+}
+
+.auth-link {
+  @apply px-4 py-2 inline-block bg-purple-500/10 rounded-lg text-purple-400 hover:text-purple-300 text-sm transition-colors;
+}
+
+/* Blink Animations */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes blink-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-blink {
+  animation: blink 1s ease-in-out infinite;
+}
+
+.animate-blink-slow {
+  animation: blink-slow 2s ease-in-out infinite;
+}
+
+.delay-150 {
+  animation-delay: 150ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
