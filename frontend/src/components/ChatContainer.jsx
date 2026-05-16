@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import ChatHeader from "./ChatHeader";
@@ -9,10 +9,17 @@ import MessagesLoadingSkeleton from "./MessagesLoadingSkeleton";
 function ChatContainer() {
   const { selectedUser, getMessagesByUserId, messages, isMessagesLoading } = useChatStore();
   const { authUser } = useAuthStore();
+  const messageEndRef = useRef(null);
 
   useEffect(() => {
     getMessagesByUserId(selectedUser._id);
   }, [selectedUser, getMessagesByUserId]);
+
+  useEffect(() => {
+    if (messageEndRef.current) {
+      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
   return (
     <div className="flex flex-col h-full bg-purple-950/20">
       <ChatHeader />
@@ -36,30 +43,31 @@ function ChatContainer() {
                   </div>
                 </div>
                 
-                <div className="chat-header mb-1 text-[11px] text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-1">
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div className="chat-header mb-1">
+                  <time className="text-xs text-purple-400 opacity-80 px-1">
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </time>
                 </div>
 
                 <div
-                  className={`chat-bubble flex flex-col relative shadow-md ${
+                  className={`chat-bubble flex flex-col ${
                     msg.senderId === authUser._id
-                      ? "bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-2xl rounded-tr-sm"
-                      : "bg-purple-900 border border-purple-800/50 text-purple-100 rounded-2xl rounded-tl-sm"
-                  } ${msg.image && !msg.text ? "p-1 bg-transparent border-none shadow-none" : ""}`}
+                      ? "bg-purple-500 text-white shadow-sm"
+                      : "bg-purple-800 text-purple-50 shadow-sm"
+                  } ${msg.image && !msg.text ? "p-1.5 bg-purple-500/80" : ""}`}
                 >
                   {msg.image && (
-                    <div className={`${msg.text ? "mb-2 mt-1" : ""}`}>
-                      <img 
-                        src={msg.image} 
-                        alt="Shared" 
-                        className="rounded-xl max-w-[240px] sm:max-w-xs md:max-w-sm h-auto object-cover shadow-sm border border-purple-800/30" 
-                      />
-                    </div>
+                    <img 
+                      src={msg.image} 
+                      alt="Attachment" 
+                      className="sm:max-w-[220px] rounded-lg object-cover" 
+                    />
                   )}
-                  {msg.text && <p className="text-[15px] leading-relaxed">{msg.text}</p>}
+                  {msg.text && <p className={`leading-relaxed ${msg.image ? "mt-2" : ""}`}>{msg.text}</p>}
                 </div>
               </div>
             ))}
+            <div ref={messageEndRef} />
           </div>
         ) : isMessagesLoading ? (
           <MessagesLoadingSkeleton />

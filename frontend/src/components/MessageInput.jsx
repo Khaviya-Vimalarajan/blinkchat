@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
+import useKeyboardSound from "../hooks/useKeyboardSound";
 import { Image, Send, X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -7,7 +8,8 @@ const MessageInput = () => {
   const [text, setText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
-  const { sendMessage } = useChatStore();
+  const { sendMessage, isSoundEnabled } = useChatStore();
+  const { playRandomKeyStrokeSound } = useKeyboardSound();
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -32,6 +34,8 @@ const MessageInput = () => {
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!text.trim() && !imagePreview) return;
+    
+    if (isSoundEnabled) playRandomKeyStrokeSound();
 
     try {
       await sendMessage({
@@ -76,7 +80,10 @@ const MessageInput = () => {
             className="w-full bg-transparent text-purple-100 text-sm focus:outline-none placeholder:text-purple-400/70"
             placeholder="Type a message..."
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              isSoundEnabled && playRandomKeyStrokeSound();
+            }}
           />
           <input
             type="file"
