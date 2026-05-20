@@ -1,9 +1,10 @@
-import { XIcon } from "lucide-react";
+import { XIcon, Zap } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useEffect } from "react";
+import toast from "react-hot-toast";
 
 function ChatHeader() {
-  const { selectedUser, setSelectedUser } = useChatStore();
+  const { selectedUser, setSelectedUser, blinkMode, setBlinkMode } = useChatStore();
 
   useEffect(() => {
     const handleEscKey = (event) => {
@@ -15,6 +16,19 @@ function ChatHeader() {
     // cleanup function
     return () => window.removeEventListener("keydown", handleEscKey);
   }, [setSelectedUser]);
+
+  const handleToggleBlinkMode = () => {
+    if (blinkMode === "off") {
+      setBlinkMode(5);
+      toast("Blink Mode: Messages disappear 5s after view!", { icon: "⚡" });
+    } else if (blinkMode === 5) {
+      setBlinkMode(10);
+      toast("Blink Mode: Messages disappear 10s after view!", { icon: "⚡" });
+    } else {
+      setBlinkMode("off");
+      toast("Blink Mode disabled", { icon: "📴" });
+    }
+  };
 
   return (
     <div className="flex justify-between items-center bg-purple-950/60 backdrop-blur-xl border-b border-purple-900/80 py-4 px-6 shrink-0 shadow-sm z-10">
@@ -33,12 +47,27 @@ function ChatHeader() {
         </div>
       </div>
 
-      <button 
-        onClick={() => setSelectedUser(null)}
-        className="p-2 rounded-full hover:bg-purple-900/80 text-purple-400 hover:text-purple-100 transition-all duration-200"
-      >
-        <XIcon className="w-5 h-5" />
-      </button>
+      <div className="flex items-center space-x-3">
+        {/* Blink Mode Toggle in Header */}
+        <button
+          onClick={handleToggleBlinkMode}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all duration-300 ${
+            blinkMode !== "off"
+              ? "bg-pink-500/20 text-pink-300 border-pink-500/50 shadow-[0_0_10px_rgba(236,72,153,0.25)] animate-pulse"
+              : "bg-purple-900/40 text-purple-400 border-purple-800/40 hover:bg-purple-800/50 hover:text-purple-300"
+          }`}
+        >
+          <Zap size={14} className={blinkMode !== "off" ? "fill-pink-400 animate-bounce" : ""} />
+          <span>Blink Mode: {blinkMode === "off" ? "OFF" : `${blinkMode}s`}</span>
+        </button>
+
+        <button 
+          onClick={() => setSelectedUser(null)}
+          className="p-2 rounded-full hover:bg-purple-900/80 text-purple-400 hover:text-purple-100 transition-all duration-200"
+        >
+          <XIcon className="w-5 h-5" />
+        </button>
+      </div>
     </div>
   );
 }
