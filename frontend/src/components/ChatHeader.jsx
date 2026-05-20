@@ -19,11 +19,10 @@ function ChatHeader() {
   return (
     <div className="flex justify-between items-center bg-purple-950/60 backdrop-blur-xl border-b border-purple-900/80 py-4 px-6 shrink-0 shadow-sm z-10">
       <div className="flex items-center space-x-4">
-        <div className="relative">
+        <div className="avatar online">
           <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-purple-900 shadow-md bg-purple-900">
             <img src={selectedUser.profilePic || "/avatar.png"} alt={selectedUser.fullName} className="object-cover w-full h-full" />
           </div>
-          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-purple-950 rounded-full shadow-sm"></span>
         </div>
 
         <div>

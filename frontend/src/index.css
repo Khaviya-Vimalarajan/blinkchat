@@ -86,3 +86,12 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(to bottom, #A855F7, #F472B6);
 }
+
+
+.avatar.online::before,
+.avatar.offline::before {
+  top: 7% !important;
+  bottom: auto !important;
+  right: 7% !important;
+  left: auto !important;
+}
