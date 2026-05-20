@@ -1,5 +1,4 @@
 import express from "express";
-
 import path from "path";
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
@@ -7,15 +6,31 @@ import { connectDB } from "./lib/db.js";
 import {ENV} from "./lib/env.js"
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import { app, server } from "./lib/socket.js";
 
-const app=express();
-const 
-__dirname =path.resolve();
+const __dirname =path.resolve();
 const PORT =ENV.PORT || 3000
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
+
+const allowedOrigins = [
+  ENV.CLIENT_URL,
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.startsWith("http://localhost:")) {
+      return callback(null, true);
+    }
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+}));
 app.use(cookieParser());
 
 app.use("/api/auth",authRoutes);
@@ -32,7 +47,7 @@ if(ENV.NODE_ENV==="production")
     });
 }
 
-app.listen(PORT,()=>
+server.listen(PORT,()=>
 {
      console.log("Server running on port :"+ PORT)
      connectDB();

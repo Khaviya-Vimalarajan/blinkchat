@@ -1,11 +1,11 @@
- {
+{
   "name": "blinkchat",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build":"npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
-    "start":"npm run start --prefix backend"
+    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
+    "start": "npm run start --prefix backend"
   },
   "repository": {
     "type": "git",
@@ -18,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/Khaviya-Vimalarajan/blinkchat/issues"
   },
-  "homepage": "https://github.com/Khaviya-Vimalarajan/blinkchat#readme"
+  "homepage": "https://github.com/Khaviya-Vimalarajan/blinkchat#readme",
+  "dependencies": {
+    "socket.io": "^4.8.3"
+  }
 }
