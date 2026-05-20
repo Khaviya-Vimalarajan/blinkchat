@@ -106,4 +106,50 @@ export const useChatStore = create((set, get) => ({
       console.warn("Failed to delete blink message on server:", error.message);
     }
   },
+
+  subscribeToMessages: () => {
+    const { selectedUser } = get();
+    if (!selectedUser) return;
+
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return;
+
+    socket.off("newMessage");
+    socket.on("newMessage", (newMessage) => {
+      if (newMessage.senderId !== selectedUser._id) return;
+      
+      set({ messages: [...get().messages, newMessage] });
+
+      socket.emit("markAsSeen", {
+        messageId: newMessage._id,
+        senderId: selectedUser._id,
+      });
+    });
+
+    socket.off("messageDeleted");
+    socket.on("messageDeleted", (messageId) => {
+      set({ messages: get().messages.filter((msg) => msg._id !== messageId) });
+    });
+
+    socket.off("messagesSeen");
+    socket.on("messagesSeen", ({ senderId, receiverId, seenAt }) => {
+      if (selectedUser._id === receiverId) {
+        const updatedMessages = get().messages.map((msg) => {
+          if (msg.senderId === senderId && msg.receiverId === receiverId && !msg.isSeen) {
+            return { ...msg, isSeen: true, seenAt };
+          }
+          return msg;
+        });
+        set({ messages: updatedMessages });
+      }
+    });
+  },
+
+  unsubscribeFromMessages: () => {
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return;
+    socket.off("newMessage");
+    socket.off("messageDeleted");
+    socket.off("messagesSeen");
+  },
 }));

@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 import UsersLoadingSkeleton from "./UsersLoadingSkeleton";
 
 function ContactList() {
   const { getAllContacts, allContacts, setSelectedUser, isUsersLoading } = useChatStore();
+  const { onlineUsers } = useAuthStore();
 
   useEffect(() => {
     getAllContacts();
@@ -13,25 +15,28 @@ function ContactList() {
 
   return (
     <div className="space-y-2">
-      {allContacts.map((contact) => (
-        <div
-          key={contact._id}
-          className="bg-purple-500/10 p-3 rounded-xl cursor-pointer hover:bg-purple-500/20 transition-all duration-300"
-          onClick={() => setSelectedUser(contact)}
-        >
-          <div className="flex items-center gap-3">
-            <div className="avatar online">
-              <div className="size-12 rounded-full overflow-hidden bg-gradient-to-r from-purple-500 to-pink-500">
-                <img src={contact.profilePic || "/avatar.png"} alt={contact.fullName} className="w-full h-full object-cover" />
+      {allContacts.map((contact) => {
+        const isOnline = onlineUsers.includes(contact._id);
+        return (
+          <div
+            key={contact._id}
+            className="bg-purple-500/10 p-3 rounded-xl cursor-pointer hover:bg-purple-500/20 transition-all duration-300"
+            onClick={() => setSelectedUser(contact)}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`avatar ${isOnline ? "online" : "offline"}`}>
+                <div className="size-12 rounded-full overflow-hidden bg-gradient-to-r from-purple-500 to-pink-500">
+                  <img src={contact.profilePic || "/avatar.png"} alt={contact.fullName} className="w-full h-full object-cover" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-white font-medium">{contact.fullName}</h4>
+                <p className="text-purple-300 text-xs">Click to start chat</p>
               </div>
             </div>
-            <div className="flex-1">
-              <h4 className="text-white font-medium">{contact.fullName}</h4>
-              <p className="text-purple-300 text-xs">Click to start chat</p>
-            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import { io, getReceiverSocketId } from "../lib/socket.js";
 
 export const getAllContacts = async (req, res) => {
   try {
@@ -32,10 +33,21 @@ export const getMessagesByUserId = async (req, res) => {
     });
 
     // Mark any unseen messages sent by the user to me as seen
-    await Message.updateMany(
+    const result = await Message.updateMany(
       { senderId: userToChatId, receiverId: myId, isSeen: false },
       { $set: { isSeen: true, seenAt: now } }
     );
+
+    if (result.modifiedCount > 0) {
+      const senderSocketId = getReceiverSocketId(userToChatId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messagesSeen", {
+          senderId: userToChatId,
+          receiverId: myId,
+          seenAt: now,
+        });
+      }
+    }
 
     const messages = await Message.find({
       $or: [
@@ -84,7 +96,11 @@ export const sendMessage = async (req, res) => {
 
     await newMessage.save();
 
-    // todo: send message in real-time if user is online - socket.io
+    // send message in real-time if user is online - socket.io
+    const receiverSocketId = getReceiverSocketId(receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("newMessage", newMessage);
+    }
 
     res.status(201).json(newMessage);
   } catch (error) {
@@ -112,6 +128,17 @@ export const deleteMessage = async (req, res) => {
     }
 
     await Message.findByIdAndDelete(messageId);
+
+    // Send event in real-time to both sender and receiver so that it disappears instantly!
+    const receiverSocketId = getReceiverSocketId(message.receiverId);
+    const senderSocketId = getReceiverSocketId(message.senderId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("messageDeleted", messageId);
+    }
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("messageDeleted", messageId);
+    }
+
     res.status(200).json({ message: "Message deleted successfully" });
   } catch (error) {
     console.error("Error in deleteMessage controller: ", error.message);
