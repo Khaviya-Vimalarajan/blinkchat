@@ -1,10 +1,13 @@
 import { XIcon, Zap } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 import { useEffect } from "react";
 import toast from "react-hot-toast";
 
 function ChatHeader() {
   const { selectedUser, setSelectedUser, blinkMode, setBlinkMode } = useChatStore();
+  const { onlineUsers } = useAuthStore();
+  const isOnline = onlineUsers.includes(selectedUser._id);
 
   useEffect(() => {
     const handleEscKey = (event) => {
@@ -44,7 +47,7 @@ function ChatHeader() {
   return (
     <div className="flex justify-between items-center bg-purple-950/60 backdrop-blur-xl border-b border-purple-900/80 py-4 px-6 shrink-0 shadow-sm z-10">
       <div className="flex items-center space-x-4">
-        <div className="avatar online">
+        <div className={`avatar ${isOnline ? "online" : "offline"}`}>
           <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-purple-900 shadow-md bg-purple-900">
             <img src={selectedUser.profilePic || "/avatar.png"} alt={selectedUser.fullName} className="object-cover w-full h-full" />
           </div>
@@ -52,8 +55,8 @@ function ChatHeader() {
 
         <div>
           <h3 className="text-purple-100 font-semibold tracking-wide text-sm">{selectedUser.fullName}</h3>
-          <p className="text-emerald-500 text-xs font-medium mt-0.5">
-            Online
+          <p className={`${isOnline ? "text-emerald-500" : "text-purple-400 opacity-60"} text-xs font-medium mt-0.5`}>
+            {isOnline ? "Online" : "Offline"}
           </p>
         </div>
       </div>

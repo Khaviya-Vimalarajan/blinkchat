@@ -155,17 +155,22 @@ function BlinkMessage({ msg, authUser, selectedUser, deleteMessage, markMessageA
 }
 
 function ChatContainer() {
-<<<<<<< Updated upstream
   const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage } = useChatStore();
-=======
   const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage, markMessageAsSeen, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
->>>>>>> Stashed changes
+
+  const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
+
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
 
   useEffect(() => {
     getMessagesByUserId(selectedUser._id);
-  }, [selectedUser, getMessagesByUserId]);
+    subscribeToMessages();
+
+    return () => {
+      unsubscribeFromMessages();
+    };
+  }, [selectedUser, getMessagesByUserId, subscribeToMessages, unsubscribeFromMessages]);
 
   useEffect(() => {
     if (messageEndRef.current) {

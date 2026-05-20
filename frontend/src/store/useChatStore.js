@@ -106,8 +106,6 @@ export const useChatStore = create((set, get) => ({
       console.warn("Failed to delete blink message on server:", error.message);
     }
   },
-<<<<<<< Updated upstream
-=======
 
   markMessageAsSeen: async (messageId) => {
     try {
@@ -142,6 +140,10 @@ export const useChatStore = create((set, get) => ({
           senderId: selectedUser._id,
         });
       }
+      socket.emit("markAsSeen", {
+        messageId: newMessage._id,
+        senderId: selectedUser._id,
+      });
     });
 
     socket.off("messageDeleted");
@@ -170,5 +172,5 @@ export const useChatStore = create((set, get) => ({
     socket.off("messageDeleted");
     socket.off("messagesSeen");
   },
->>>>>>> Stashed changes
+
 }));
