@@ -155,10 +155,16 @@ function BlinkMessage({ msg, authUser, selectedUser, deleteMessage, markMessageA
 }
 
 function ChatContainer() {
-  const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage } = useChatStore();
-  const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage, markMessageAsSeen, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
-
-  const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
+  const {
+    selectedUser,
+    getMessagesByUserId,
+    messages,
+    isMessagesLoading,
+    deleteMessage,
+    markMessageAsSeen,
+    subscribeToMessages,
+    unsubscribeFromMessages,
+  } = useChatStore();
 
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);

@@ -31,16 +31,9 @@ export const getMessagesByUserId = async (req, res) => {
         ],
       },
     });
-
-<<<<<<< Updated upstream
-    // Mark any unseen messages sent by the user to me as seen
-    const result = await Message.updateMany(
-      { senderId: userToChatId, receiverId: myId, isSeen: false },
-=======
     // Mark any unseen messages sent by the user to me as seen (exclude blink messages)
     const result = await Message.updateMany(
       { senderId: userToChatId, receiverId: myId, isSeen: false, isBlink: false },
->>>>>>> Stashed changes
       { $set: { isSeen: true, seenAt: now } }
     );
 

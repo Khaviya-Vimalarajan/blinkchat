@@ -140,10 +140,6 @@ export const useChatStore = create((set, get) => ({
           senderId: selectedUser._id,
         });
       }
-      socket.emit("markAsSeen", {
-        messageId: newMessage._id,
-        senderId: selectedUser._id,
-      });
     });
 
     socket.off("messageDeleted");
