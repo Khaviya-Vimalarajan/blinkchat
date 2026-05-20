@@ -18,6 +18,25 @@ export const getMessagesByUserId = async (req, res) => {
     const myId = req.user._id;
     const { id: userToChatId } = req.params;
 
+    // Delete expired blink messages from the database before retrieving
+    const now = new Date();
+    await Message.deleteMany({
+      isBlink: true,
+      isSeen: true,
+      $expr: {
+        $lte: [
+          { $add: ["$seenAt", { $multiply: ["$blinkDuration", 1000] }] },
+          now,
+        ],
+      },
+    });
+
+    // Mark any unseen messages sent by the user to me as seen
+    await Message.updateMany(
+      { senderId: userToChatId, receiverId: myId, isSeen: false },
+      { $set: { isSeen: true, seenAt: now } }
+    );
+
     const messages = await Message.find({
       $or: [
         { senderId: myId, receiverId: userToChatId },
@@ -34,7 +53,7 @@ export const getMessagesByUserId = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, isBlink, blinkDuration } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
      
@@ -59,6 +78,8 @@ export const sendMessage = async (req, res) => {
       receiverId,
       text,
       image: imageUrl,
+      isBlink: isBlink || false,
+      blinkDuration: blinkDuration || 5,
     });
 
     await newMessage.save();
@@ -68,6 +89,32 @@ export const sendMessage = async (req, res) => {
     res.status(201).json(newMessage);
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const deleteMessage = async (req, res) => {
+  try {
+    const { id: messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Check if the user is either the sender or receiver
+    if (
+      message.senderId.toString() !== userId.toString() &&
+      message.receiverId.toString() !== userId.toString()
+    ) {
+      return res.status(403).json({ message: "Unauthorized to delete this message" });
+    }
+
+    await Message.findByIdAndDelete(messageId);
+    res.status(200).json({ message: "Message deleted successfully" });
+  } catch (error) {
+    console.error("Error in deleteMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

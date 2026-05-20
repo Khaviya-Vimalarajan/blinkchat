@@ -11,6 +11,7 @@ export const useChatStore = create((set, get) => ({
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
+  blinkMode: "off", // "off", 5, 10
   isSoundEnabled: localStorage.getItem("isSoundEnabled") !== null 
     ? JSON.parse(localStorage.getItem("isSoundEnabled")) 
     : true,
@@ -22,6 +23,7 @@ export const useChatStore = create((set, get) => ({
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   setSelectedUser: (selectedUser) => set({ selectedUser }),
+  setBlinkMode: (blinkMode) => set({ blinkMode }),
 
   getAllContacts: async () => {
     set({ isUsersLoading: true });
@@ -59,27 +61,49 @@ export const useChatStore = create((set, get) => ({
   },
 
   sendMessage: async (messageData) => {
-    const { selectedUser, messages } = get();
+    const { selectedUser, messages, blinkMode } = get();
     const { authUser } = useAuthStore.getState();
     const tempId = `temp-${Date.now()}`;
+    
+    const isBlink = blinkMode !== "off";
+    const blinkDuration = blinkMode === "off" ? 5 : parseInt(blinkMode, 10);
+    
+    const payload = {
+      ...messageData,
+      isBlink,
+      blinkDuration,
+    };
+
     const optimisticMessage = {
       _id: tempId,
       senderId: authUser._id,
       receiverId: selectedUser._id,
       text: messageData.text,
       image: messageData.image,
+      isBlink,
+      blinkDuration,
+      isSeen: false,
       createdAt: new Date().toISOString(),
-      isOptimistic: true, // flag to identify optimistic messages (optional)
+      isOptimistic: true,
     };
-    // immidetaly update the ui by adding the message
+    // immediately update the ui by adding the message
     set({ messages: [...messages, optimisticMessage] });
     try {
-      const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
+      const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, payload);
       set({ messages: messages.concat(res.data) });
     } catch (error) {
       // remove optimistic message on failure
       set({ messages: messages });
       toast.error(error.response?.data?.message || "Something went wrong");
+    }
+  },
+
+  deleteMessage: async (messageId) => {
+    set({ messages: get().messages.filter((msg) => msg._id !== messageId) });
+    try {
+      await axiosInstance.delete(`/messages/${messageId}`);
+    } catch (error) {
+      console.warn("Failed to delete blink message on server:", error.message);
     }
   },
 }));

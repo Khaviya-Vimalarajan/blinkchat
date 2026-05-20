@@ -1,14 +1,14 @@
 import { useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import useKeyboardSound from "../hooks/useKeyboardSound";
-import { Image, Send, X } from "lucide-react";
+import { Image, Send, X, Zap } from "lucide-react";
 import toast from "react-hot-toast";
 
 const MessageInput = () => {
   const [text, setText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
-  const { sendMessage, isSoundEnabled } = useChatStore();
+  const { sendMessage, isSoundEnabled, blinkMode, setBlinkMode } = useChatStore();
   const { playRandomKeyStrokeSound } = useKeyboardSound();
 
   const handleImageChange = (e) => {
@@ -29,6 +29,19 @@ const MessageInput = () => {
   const removeImage = () => {
     setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleToggleBlinkMode = () => {
+    if (blinkMode === "off") {
+      setBlinkMode(5);
+      toast("Blink Mode: Messages disappear 5s after view!", { icon: "⚡" });
+    } else if (blinkMode === 5) {
+      setBlinkMode(10);
+      toast("Blink Mode: Messages disappear 10s after view!", { icon: "⚡" });
+    } else {
+      setBlinkMode("off");
+      toast("Blink Mode disabled", { icon: "📴" });
+    }
   };
 
   const handleSendMessage = async (e) => {
@@ -74,11 +87,15 @@ const MessageInput = () => {
       )}
 
       <form onSubmit={handleSendMessage} className="flex items-center gap-2 max-w-3xl mx-auto">
-        <div className="flex-1 flex items-center gap-2 bg-purple-900/50 rounded-full px-4 py-2.5 border border-purple-800/50 focus-within:border-pink-500/50 focus-within:ring-1 focus-within:ring-pink-500/50 transition-all shadow-inner">
+        <div className={`flex-1 flex items-center gap-2 bg-purple-900/50 rounded-full px-4 py-2.5 border transition-all duration-300 shadow-inner ${
+          blinkMode !== "off"
+            ? "border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.35)] ring-1 ring-pink-500/30"
+            : "border-purple-800/50 focus-within:border-pink-500/50 focus-within:ring-1 focus-within:ring-pink-500/50"
+        }`}>
           <input
             type="text"
             className="w-full bg-transparent text-purple-100 text-sm focus:outline-none placeholder:text-purple-400/70"
-            placeholder="Type a message..."
+            placeholder={blinkMode !== "off" ? `Send a disappearing message (${blinkMode}s)...` : "Type a message..."}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
@@ -92,6 +109,26 @@ const MessageInput = () => {
             ref={fileInputRef}
             onChange={handleImageChange}
           />
+          
+          {/* Blink Mode Toggle */}
+          <button
+            type="button"
+            className={`p-1.5 rounded-full transition-all relative ${
+              blinkMode !== "off"
+                ? "text-pink-400 bg-pink-500/10 hover:bg-pink-500/20"
+                : "text-purple-400 hover:bg-purple-800/80"
+            }`}
+            onClick={handleToggleBlinkMode}
+            title={blinkMode === "off" ? "Enable Blink Mode" : `Blink Mode: ${blinkMode}s`}
+          >
+            <Zap size={18} className={blinkMode !== "off" ? "animate-pulse scale-110" : ""} />
+            {blinkMode !== "off" && (
+              <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-md">
+                {blinkMode}s
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             className={`p-1.5 rounded-full hover:bg-purple-800/80 transition-colors ${
@@ -99,7 +136,7 @@ const MessageInput = () => {
             }`}
             onClick={() => fileInputRef.current?.click()}
           >
-            <Image size={20} />
+            <Image size={18} />
           </button>
         </div>
         <button

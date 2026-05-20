@@ -20,6 +20,21 @@ const messageSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    isBlink: {
+      type: Boolean,
+      default: false,
+    },
+    isSeen: {
+      type: Boolean,
+      default: false,
+    },
+    seenAt: {
+      type: Date,
+    },
+    blinkDuration: {
+      type: Number,
+      default: 5,
+    },
   },
   { timestamps: true }
 );
