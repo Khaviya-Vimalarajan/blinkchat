@@ -120,30 +120,32 @@ function ProfileHeader() {
         <div className="flex items-center gap-3">
           {/* AVATAR */}
           <div className="avatar online">
-            <button
-              className="size-12 rounded-full overflow-hidden relative group"
-              onClick={handleButtonClick}
-              disabled={isUpdatingProfile}
-              type="button"
-            >
-              <img
-                src={
-                  previewImage ||
-                  authUser?.profilePic ||
-                  "/avatar.png"
-                }
-                alt="User image"
-                className="w-full h-full object-cover"
-              />
+            <div className="size-12 rounded-full overflow-hidden relative group">
+              <button
+                className="w-full h-full"
+                onClick={handleButtonClick}
+                disabled={isUpdatingProfile}
+                type="button"
+              >
+                <img
+                  src={
+                    previewImage ||
+                    authUser?.profilePic ||
+                    "/avatar.png"
+                  }
+                  alt="User image"
+                  className="w-full h-full object-cover"
+                />
 
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full">
-                {isUpdatingProfile ? (
-                  <LoaderIcon className="w-4 h-4 text-white animate-spin" />
-                ) : (
-                  <CameraIcon className="w-4 h-4 text-white" />
-                )}
-              </div>
-            </button>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full">
+                  {isUpdatingProfile ? (
+                    <LoaderIcon className="w-4 h-4 text-white animate-spin" />
+                  ) : (
+                    <CameraIcon className="w-4 h-4 text-white" />
+                  )}
+                </div>
+              </button>
+            </div>
 
             <input
               type="file"
