@@ -21,12 +21,23 @@ function ChatHeader() {
   }, [setSelectedUser]);
 
   const handleToggleBlinkMode = () => {
+    const hasSeen = localStorage.getItem("hasSeenBlinkIntro");
     if (blinkMode === "off") {
       setBlinkMode(5);
-      toast("Blink Mode: Messages disappear 5s after view!", { icon: "⚡" });
+      if (!hasSeen) {
+        toast("Blink Mode: Messages disappear 5s after view!", { icon: "⚡" });
+        localStorage.setItem("hasSeenBlinkIntro", "true");
+      } else {
+        toast("Blink Mode: 5s", { icon: "⚡" });
+      }
     } else if (blinkMode === 5) {
       setBlinkMode(10);
-      toast("Blink Mode: Messages disappear 10s after view!", { icon: "⚡" });
+      if (!hasSeen) {
+        toast("Blink Mode: Messages disappear 10s after view!", { icon: "⚡" });
+        localStorage.setItem("hasSeenBlinkIntro", "true");
+      } else {
+        toast("Blink Mode: 10s", { icon: "⚡" });
+      }
     } else {
       setBlinkMode("off");
       toast("Blink Mode disabled", { icon: "📴" });

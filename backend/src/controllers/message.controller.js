@@ -32,9 +32,15 @@ export const getMessagesByUserId = async (req, res) => {
       },
     });
 
+<<<<<<< Updated upstream
     // Mark any unseen messages sent by the user to me as seen
     const result = await Message.updateMany(
       { senderId: userToChatId, receiverId: myId, isSeen: false },
+=======
+    // Mark any unseen messages sent by the user to me as seen (exclude blink messages)
+    const result = await Message.updateMany(
+      { senderId: userToChatId, receiverId: myId, isSeen: false, isBlink: false },
+>>>>>>> Stashed changes
       { $set: { isSeen: true, seenAt: now } }
     );
 
@@ -170,6 +176,44 @@ export const getChatPartners = async (req, res) => {
     res.status(200).json(chatPartners);
   } catch (error) {
     console.error("Error in getChatPartners: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const markMessageAsSeen = async (req, res) => {
+  try {
+    const { id: messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Only the receiver can mark the message as seen
+    if (message.receiverId.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "Unauthorized to mark this message as seen" });
+    }
+
+    if (!message.isSeen) {
+      message.isSeen = true;
+      message.seenAt = new Date();
+      await message.save();
+
+      // Emit socket event to the sender so their UI updates in real-time
+      const senderSocketId = getReceiverSocketId(message.senderId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messagesSeen", {
+          senderId: message.senderId,
+          receiverId: userId,
+          seenAt: message.seenAt,
+        });
+      }
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.error("Error in markMessageAsSeen controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

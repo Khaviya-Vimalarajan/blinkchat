@@ -107,6 +107,20 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  markMessageAsSeen: async (messageId) => {
+    try {
+      const res = await axiosInstance.put(`/messages/${messageId}/seen`);
+      const updatedMsg = res.data;
+      set({
+        messages: get().messages.map((msg) =>
+          msg._id === messageId ? { ...msg, ...updatedMsg } : msg
+        ),
+      });
+    } catch (error) {
+      console.warn("Failed to mark message as seen:", error.message);
+    }
+  },
+
   subscribeToMessages: () => {
     const { selectedUser } = get();
     if (!selectedUser) return;
@@ -120,6 +134,12 @@ export const useChatStore = create((set, get) => ({
       
       set({ messages: [...get().messages, newMessage] });
 
+      if (!newMessage.isBlink) {
+        socket.emit("markAsSeen", {
+          messageId: newMessage._id,
+          senderId: selectedUser._id,
+        });
+      }
       socket.emit("markAsSeen", {
         messageId: newMessage._id,
         senderId: selectedUser._id,
@@ -152,4 +172,5 @@ export const useChatStore = create((set, get) => ({
     socket.off("messageDeleted");
     socket.off("messagesSeen");
   },
+
 }));

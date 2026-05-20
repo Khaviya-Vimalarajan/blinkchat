@@ -5,9 +5,11 @@ import ChatHeader from "./ChatHeader";
 import NoChatHistoryPlaceholder from "./NoChatHistoryPlaceholder";
 import MessageInput from "./MessageInput";
 import MessagesLoadingSkeleton from "./MessagesLoadingSkeleton";
+import { Lock, Eye, Clock } from "lucide-react";
 
-function BlinkMessage({ msg, authUser, selectedUser, deleteMessage }) {
+function BlinkMessage({ msg, authUser, selectedUser, deleteMessage, markMessageAsSeen }) {
   const [timeLeft, setTimeLeft] = useState(null);
+  const [isRevealing, setIsRevealing] = useState(false);
 
   useEffect(() => {
     if (!msg.isBlink) return;
@@ -53,6 +55,18 @@ function BlinkMessage({ msg, authUser, selectedUser, deleteMessage }) {
 
   const isSender = msg.senderId === authUser._id;
 
+  const handleReveal = async () => {
+    if (isRevealing || msg.isSeen) return;
+    setIsRevealing(true);
+    try {
+      await markMessageAsSeen(msg._id);
+    } catch (err) {
+      console.error("Failed to reveal message:", err);
+    } finally {
+      setIsRevealing(false);
+    }
+  };
+
   return (
     <div
       className={`chat ${isSender ? "chat-end" : "chat-start"} group animate-in fade-in slide-in-from-bottom-2 duration-300`}
@@ -80,44 +94,72 @@ function BlinkMessage({ msg, authUser, selectedUser, deleteMessage }) {
         )}
       </div>
 
-      <div
-        className={`chat-bubble flex flex-col relative ${
-          isSender
-            ? "bg-purple-500 text-white shadow-sm"
-            : "bg-purple-800 text-purple-50 shadow-sm"
-        } ${msg.image && !msg.text ? "p-1.5 bg-purple-500/80" : ""} ${
-          msg.isBlink ? "border border-pink-500/40" : ""
-        }`}
-      >
-        {msg.image && (
-          <img 
-            src={msg.image} 
-            alt="Attachment" 
-            className="sm:max-w-[220px] rounded-lg object-cover" 
-          />
-        )}
-        {msg.text && <p className={`leading-relaxed ${msg.image ? "mt-2" : ""}`}>{msg.text}</p>}
-
-        {msg.isBlink && (
-          <div className="mt-1 flex items-center justify-end text-[9px] text-pink-300 font-semibold gap-1 select-none">
-            {msg.isSeen ? (
-              <span className="animate-pulse flex items-center gap-1">
-                ⏱️ Disappearing in {timeLeft !== null ? `${timeLeft}s` : `${msg.blinkDuration}s`}
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 opacity-70">
-                🔒 Locked until read
-              </span>
-            )}
+      {msg.isBlink && !isSender && !msg.isSeen ? (
+        /* Secured Locked View for Receiver */
+        <div className="chat-bubble bg-purple-950/40 border border-pink-500/30 rounded-2xl p-4 flex flex-col items-center justify-center gap-3 max-w-xs shadow-lg shadow-purple-950/50">
+          <div className="p-3 bg-pink-500/10 rounded-full text-pink-400 border border-pink-500/20 animate-pulse">
+            <Lock className="w-5 h-5" />
           </div>
-        )}
-      </div>
+          <div className="text-center">
+            <p className="text-xs text-purple-100 font-semibold">Disappearing Message</p>
+            <p className="text-[10px] text-purple-400 mt-0.5">Disappears {msg.blinkDuration}s after opening</p>
+          </div>
+          <button
+            onClick={handleReveal}
+            disabled={isRevealing}
+            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 disabled:from-purple-800 disabled:to-pink-800 text-white rounded-full text-xs font-semibold tracking-wide transition-all duration-300 shadow-md shadow-pink-900/10 active:scale-95 disabled:scale-100 disabled:opacity-60"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>{isRevealing ? "Revealing..." : "Reveal Message"}</span>
+          </button>
+        </div>
+      ) : (
+        /* Regular Message View (Sender always sees it, Receiver sees it after they tap reveal) */
+        <div
+          className={`chat-bubble flex flex-col relative ${
+            isSender
+              ? "bg-purple-500 text-white shadow-sm"
+              : "bg-purple-800 text-purple-50 shadow-sm"
+          } ${msg.image && !msg.text ? "p-1.5 bg-purple-500/80" : ""} ${
+            msg.isBlink ? "border border-pink-500/40" : ""
+          }`}
+        >
+          {msg.image && (
+            <img 
+              src={msg.image} 
+              alt="Attachment" 
+              className="sm:max-w-[220px] rounded-lg object-cover" 
+            />
+          )}
+          {msg.text && <p className={`leading-relaxed ${msg.image ? "mt-2" : ""}`}>{msg.text}</p>}
+
+          {msg.isBlink && (
+            <div className="mt-1.5 flex items-center justify-end text-[9px] text-pink-300 font-semibold gap-1 select-none">
+              {msg.isSeen ? (
+                <span className="animate-pulse flex items-center gap-1 bg-pink-500/15 px-1.5 py-0.5 rounded-md border border-pink-500/20">
+                  <Clock className="w-2.5 h-2.5" />
+                  Disappearing in {timeLeft !== null ? `${timeLeft}s` : `${msg.blinkDuration}s`}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 opacity-70 bg-purple-900/45 px-1.5 py-0.5 rounded-md">
+                  <Lock className="w-2.5 h-2.5" />
+                  Sent (Locked until read)
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 function ChatContainer() {
+  const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage } = useChatStore();
+  const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage, markMessageAsSeen, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
+
   const { selectedUser, getMessagesByUserId, messages, isMessagesLoading, deleteMessage, subscribeToMessages, unsubscribeFromMessages } = useChatStore();
+
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
 
@@ -149,6 +191,7 @@ function ChatContainer() {
                 authUser={authUser} 
                 selectedUser={selectedUser} 
                 deleteMessage={deleteMessage} 
+                markMessageAsSeen={markMessageAsSeen}
               />
             ))}
             <div ref={messageEndRef} />
