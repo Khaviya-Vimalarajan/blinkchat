@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import useKeyboardSound from "../hooks/useKeyboardSound";
 import { Image, Send, X, Zap } from "lucide-react";
@@ -10,6 +10,21 @@ const MessageInput = () => {
   const fileInputRef = useRef(null);
   const { sendMessage, isSoundEnabled, blinkMode, setBlinkMode } = useChatStore();
   const { playRandomKeyStrokeSound } = useKeyboardSound();
+
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -57,6 +72,10 @@ const MessageInput = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
+    if (!navigator.onLine) {
+      toast.error("No network connection! Failed to send message.", { icon: "📶" });
+      return;
+    }
     if (!text.trim() && !imagePreview) return;
     
     if (isSoundEnabled) playRandomKeyStrokeSound();
@@ -99,19 +118,22 @@ const MessageInput = () => {
 
       <form onSubmit={handleSendMessage} className="flex items-center gap-2 max-w-3xl mx-auto">
         <div className={`flex-1 flex items-center gap-2 bg-purple-900/50 rounded-full px-4 py-2.5 border transition-all duration-300 shadow-inner ${
-          blinkMode !== "off"
+          !isOnline 
+            ? "border-red-950/40 bg-purple-950/20" 
+            : blinkMode !== "off"
             ? "border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.35)] ring-1 ring-pink-500/30"
             : "border-purple-800/50 focus-within:border-pink-500/50 focus-within:ring-1 focus-within:ring-pink-500/50"
         }`}>
           <input
             type="text"
-            className="w-full bg-transparent text-purple-100 text-sm focus:outline-none placeholder:text-purple-400/70"
-            placeholder={blinkMode !== "off" ? `Send a disappearing message (${blinkMode}s)...` : "Type a message..."}
+            className="w-full bg-transparent text-purple-100 text-sm focus:outline-none placeholder:text-purple-400/50 disabled:opacity-40 disabled:cursor-not-allowed"
+            placeholder={!isOnline ? "You are offline. Waiting for connection..." : blinkMode !== "off" ? `Send a disappearing message (${blinkMode}s)...` : "Type a message..."}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
               isSoundEnabled && playRandomKeyStrokeSound();
             }}
+            disabled={!isOnline}
           />
           <input
             type="file"
@@ -119,18 +141,20 @@ const MessageInput = () => {
             className="hidden"
             ref={fileInputRef}
             onChange={handleImageChange}
+            disabled={!isOnline}
           />
           
           {/* Blink Mode Toggle */}
           <button
             type="button"
-            className={`p-1.5 rounded-full transition-all relative ${
+            className={`p-1.5 rounded-full transition-all relative disabled:opacity-30 disabled:cursor-not-allowed ${
               blinkMode !== "off"
                 ? "text-pink-400 bg-pink-500/10 hover:bg-pink-500/20"
                 : "text-purple-400 hover:bg-purple-800/80"
             }`}
             onClick={handleToggleBlinkMode}
-            title={blinkMode === "off" ? "Enable Blink Mode" : `Blink Mode: ${blinkMode}s`}
+            disabled={!isOnline}
+            title={!isOnline ? "Unavailable offline" : blinkMode === "off" ? "Enable Blink Mode" : `Blink Mode: ${blinkMode}s`}
           >
             <Zap size={18} className={blinkMode !== "off" ? "animate-pulse scale-110" : ""} />
             {blinkMode !== "off" && (
@@ -142,18 +166,21 @@ const MessageInput = () => {
 
           <button
             type="button"
-            className={`p-1.5 rounded-full hover:bg-purple-800/80 transition-colors ${
+            className={`p-1.5 rounded-full hover:bg-purple-800/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
               imagePreview ? "text-pink-400" : "text-purple-400"
             }`}
             onClick={() => fileInputRef.current?.click()}
+            disabled={!isOnline}
+            title={!isOnline ? "Unavailable offline" : "Upload Image"}
           >
             <Image size={18} />
           </button>
         </div>
         <button
           type="submit"
-          disabled={!text.trim() && !imagePreview}
-          className="p-3.5 bg-gradient-to-r from-purple-600 to-pink-500 rounded-full text-white hover:from-purple-500 hover:to-pink-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg shadow-pink-900/20"
+          disabled={(!text.trim() && !imagePreview) || !isOnline}
+          className="p-3.5 bg-gradient-to-r from-purple-600 to-pink-500 rounded-full text-white hover:from-purple-500 hover:to-pink-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center shadow-lg shadow-pink-900/20"
+          title={!isOnline ? "You are offline" : "Send Message"}
         >
           <Send size={18} className="translate-x-[1px] translate-y-[1px]" />
         </button>
