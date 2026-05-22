@@ -35,6 +35,25 @@ const messageSchema = new mongoose.Schema(
       type: Number,
       default: 5,
     },
+    reactions: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        emoji: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
+    deletedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true }
 );

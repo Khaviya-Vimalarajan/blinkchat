@@ -1,4 +1,5 @@
 import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
 import ProfileHeader from "../components/ProfileHeader";
 import ActiveTabSwitch from "../components/ActiveTabSwitch";
@@ -6,9 +7,37 @@ import ChatsList from "../components/ChatsList";
 import ContactList from "../components/ContactList";
 import ChatContainer from "../components/ChatContainer";
 import NoConversationPlaceholder from "../components/NoConversationPlaceholder";
+import { useEffect } from "react";
 
 function ChatPage() {
-  const { activeTab, selectedUser } = useChatStore();
+  const { activeTab, selectedUser, subscribeToMessages, unsubscribeFromMessages, getAllContacts } = useChatStore();
+  const { socket } = useAuthStore();
+
+  useEffect(() => {
+    getAllContacts();
+    subscribeToMessages();
+    return () => {
+      unsubscribeFromMessages();
+    };
+  }, [subscribeToMessages, unsubscribeFromMessages, getAllContacts, socket]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      const handleRequestPermission = () => {
+        if (Notification.permission === "default") {
+          Notification.requestPermission().catch(console.error);
+        }
+        document.removeEventListener("click", handleRequestPermission);
+      };
+
+      if (Notification.permission === "default") {
+        document.addEventListener("click", handleRequestPermission);
+        return () => {
+          document.removeEventListener("click", handleRequestPermission);
+        };
+      }
+    }
+  }, []);
 
   return (
     <div className="relative w-full max-w-6xl h-[800px]">
