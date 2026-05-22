@@ -29,7 +29,7 @@ const io = new Server(server, {
 const userSocketMap = {};
 
 export function getReceiverSocketId(receiverId) {
-  return userSocketMap[receiverId];
+  return userSocketMap[receiverId ? receiverId.toString() : ""];
 }
 
 io.on("connection", (socket) => {

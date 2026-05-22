@@ -31,9 +31,16 @@ function ChatsList() {
                   <img src={chat.profilePic || "/avatar.png"} alt={chat.fullName} className="w-full h-full object-cover" />
                 </div>
               </div>
-              <div className="flex-1">
-                <h4 className="text-white font-medium truncate">{chat.fullName}</h4>
-                <p className="text-purple-300 text-xs truncate">{chat.lastMessage || "Click to start chatting"}</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-white font-medium truncate">{chat.fullName}</h4>
+                  {chat.unreadCount > 0 && (
+                    <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white text-[10px] font-bold h-5 min-w-5 px-1.5 rounded-full flex items-center justify-center shadow-md shadow-pink-500/20 shrink-0 animate-pulse">
+                      {chat.unreadCount}
+                    </span>
+                  )}
+                </div>
+                <p className="text-purple-300 text-xs truncate mt-0.5">{chat.lastMessage || "Click to start chatting"}</p>
               </div>
             </div>
           </div>
