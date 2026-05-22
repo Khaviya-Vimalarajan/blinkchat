@@ -130,6 +130,26 @@ function BlinkMessage({
             ⚡ Blink
           </span>
         )}
+        {/* Seen / Sent / Pending indicator for sender messages */}
+        {isSender && !msg.isBlink && (
+          <span 
+            className="inline-flex items-center ml-0.5 select-none animate-in fade-in duration-200" 
+            title={msg.isOptimistic ? "Sending..." : msg.isSeen ? `Seen at ${new Date(msg.seenAt || msg.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "Sent"}
+          >
+            {msg.isOptimistic ? (
+              <Clock className="w-3.5 h-3.5 text-purple-400 opacity-40 animate-spin" />
+            ) : msg.isSeen ? (
+              <span className="flex text-pink-400 opacity-90 transition-all duration-300 scale-105">
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <Check className="w-3.5 h-3.5 stroke-[3] -ml-2" />
+              </span>
+            ) : (
+              <span className="text-purple-400 opacity-50">
+                <Check className="w-3.5 h-3.5 stroke-[2]" />
+              </span>
+            )}
+          </span>
+        )}
       </div>
 
       {msg.isBlink && !isSender && !msg.isSeen ? (
@@ -404,6 +424,27 @@ function ChatContainer() {
     getMessagesByUserId(selectedUser._id);
   }, [selectedUser, getMessagesByUserId]);
 
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("Back online! Reconnecting...", { icon: "📶" });
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.error("Connection lost. Working offline.", { icon: "📶" });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     if (messageEndRef.current) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -413,6 +454,12 @@ function ChatContainer() {
   return (
     <div className="flex flex-col h-full bg-purple-950/20 relative">
       <ChatHeader />
+      {!isOnline && (
+        <div className="bg-red-500/25 border-b border-red-500/40 text-red-200 px-4 py-2.5 text-xs font-semibold flex items-center justify-center gap-2 select-none animate-in slide-in-from-top duration-300">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+          <span>No internet connection. Waiting for network...</span>
+        </div>
+      )}
       <div className="flex-1 px-6 overflow-y-auto py-8">
         {messages.length > 0 && !isMessagesLoading ? (
           <div className="max-w-4xl mx-auto space-y-6 pb-4">
