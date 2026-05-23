@@ -5,6 +5,7 @@ import ProfileHeader from "../components/ProfileHeader";
 import ActiveTabSwitch from "../components/ActiveTabSwitch";
 import ChatsList from "../components/ChatsList";
 import ContactList from "../components/ContactList";
+import GroupsList from "../components/GroupsList";
 import ChatContainer from "../components/ChatContainer";
 import NoConversationPlaceholder from "../components/NoConversationPlaceholder";
 import { useEffect } from "react";
@@ -48,7 +49,13 @@ function ChatPage() {
           <ActiveTabSwitch />
 
           <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-            {activeTab === "chats" ? <ChatsList /> : <ContactList />}
+            {activeTab === "chats" ? (
+              <ChatsList />
+            ) : activeTab === "groups" ? (
+              <GroupsList />
+            ) : (
+              <ContactList />
+            )}
           </div>
         </div>
 

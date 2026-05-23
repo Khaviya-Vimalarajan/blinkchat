@@ -1,5 +1,6 @@
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import Group from "../models/Group.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 
 export const getAllContacts = async (req, res) => {
@@ -122,7 +123,7 @@ export const deleteMessage = async (req, res) => {
     // Only the sender can delete a message for everyone
     if (message.senderId.toString() !== userId.toString()) {
       // If it is a blink message and the request comes from the receiver, allow deletion
-      if (message.isBlink && message.receiverId.toString() === userId.toString()) {
+      if (message.isBlink && message.receiverId && message.receiverId.toString() === userId.toString()) {
         // Allowed: receiver deleting an expired/active blink message
       } else {
         return res.status(403).json({ message: "Only the sender can delete this message for everyone" });
@@ -131,14 +132,26 @@ export const deleteMessage = async (req, res) => {
 
     await Message.findByIdAndDelete(messageId);
 
-    // Send event in real-time to both sender and receiver so that it disappears instantly!
-    const receiverSocketId = getReceiverSocketId(message.receiverId);
-    const senderSocketId = getReceiverSocketId(message.senderId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("messageDeleted", messageId);
-    }
-    if (senderSocketId) {
-      io.to(senderSocketId).emit("messageDeleted", messageId);
+    // Send event in real-time to all participants (either group members or 1v1 receiver/sender)
+    if (message.groupId) {
+      const group = await Group.findById(message.groupId);
+      if (group) {
+        group.members.forEach((memberId) => {
+          const socketId = getReceiverSocketId(memberId);
+          if (socketId) {
+            io.to(socketId).emit("messageDeleted", messageId);
+          }
+        });
+      }
+    } else {
+      const receiverSocketId = getReceiverSocketId(message.receiverId);
+      const senderSocketId = getReceiverSocketId(message.senderId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("messageDeleted", messageId);
+      }
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageDeleted", messageId);
+      }
     }
 
     res.status(200).json({ message: "Message deleted successfully" });
@@ -152,21 +165,24 @@ export const getChatPartners = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
 
-    // find all the messages where the logged-in user is either sender or receiver, and hasn't self-deleted the message
+    // Fetch messages where the user is a participant, ensuring direct chats have a receiverId
     const messages = await Message.find({
       $or: [
         { senderId: loggedInUserId, deletedBy: { $ne: loggedInUserId } },
         { receiverId: loggedInUserId, deletedBy: { $ne: loggedInUserId } },
       ],
+      receiverId: { $ne: null }, // exclude group messages without a direct counterpart
     });
 
+    // Extract unique partner IDs from direct messages
     const chatPartnerIds = [
       ...new Set(
-        messages.map((msg) =>
-          msg.senderId.toString() === loggedInUserId.toString()
-            ? msg.receiverId.toString()
-            : msg.senderId.toString()
-        )
+        messages.map((msg) => {
+          if (msg.receiverId && msg.receiverId.toString() !== loggedInUserId.toString()) {
+            return msg.receiverId.toString();
+          }
+          return msg.senderId.toString();
+        })
       ),
     ];
 
@@ -181,7 +197,7 @@ export const getChatPartners = async (req, res) => {
           deletedBy: { $ne: loggedInUserId },
         });
 
-        // Get last message in the chat that is not self-deleted
+        // Get the most recent direct message between the two users
         const lastMsg = await Message.findOne({
           $or: [
             { senderId: loggedInUserId, receiverId: partner._id },
@@ -207,13 +223,13 @@ export const getChatPartners = async (req, res) => {
       })
     );
 
-    // Sort partners by their last message activity if possible, or keep original order
     res.status(200).json(chatPartnersWithUnread);
   } catch (error) {
     console.error("Error in getChatPartners: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
 
 export const markMessageAsSeen = async (req, res) => {
   try {
@@ -264,12 +280,20 @@ export const deleteMessageForMyself = async (req, res) => {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    // Verify user is sender or receiver of the message
-    if (
-      message.senderId.toString() !== userId.toString() &&
-      message.receiverId.toString() !== userId.toString()
-    ) {
-      return res.status(403).json({ message: "Unauthorized to delete this message" });
+    // Verify user is sender or receiver of the message (or group member)
+    if (message.groupId) {
+      const group = await Group.findById(message.groupId);
+      const isMember = group ? group.members.some((mId) => mId.toString() === userId.toString()) : false;
+      if (!isMember) {
+        return res.status(403).json({ message: "Unauthorized to delete this message" });
+      }
+    } else {
+      if (
+        message.senderId.toString() !== userId.toString() &&
+        (!message.receiverId || message.receiverId.toString() !== userId.toString())
+      ) {
+        return res.status(403).json({ message: "Unauthorized to delete this message" });
+      }
     }
 
     // Add user to deletedBy array if not already present
@@ -278,14 +302,25 @@ export const deleteMessageForMyself = async (req, res) => {
       await message.save();
     }
 
-    // Optimization: If both sender and receiver have deleted it for themselves, remove it from the DB
-    const participantsDeleted = [message.senderId.toString(), message.receiverId.toString()];
-    const allDeleted = participantsDeleted.every((id) =>
-      message.deletedBy.some((delId) => delId.toString() === id)
-    );
-
-    if (allDeleted) {
-      await Message.findByIdAndDelete(messageId);
+    // Optimization: If all participants have deleted it for themselves, remove it from the DB
+    if (message.groupId) {
+      const group = await Group.findById(message.groupId);
+      if (group) {
+        const allDeleted = group.members.every((memberId) =>
+          message.deletedBy.some((delId) => delId.toString() === memberId.toString())
+        );
+        if (allDeleted) {
+          await Message.findByIdAndDelete(messageId);
+        }
+      }
+    } else {
+      const participantsDeleted = [message.senderId.toString(), message.receiverId?.toString()].filter(Boolean);
+      const allDeleted = participantsDeleted.every((id) =>
+        message.deletedBy.some((delId) => delId.toString() === id)
+      );
+      if (allDeleted) {
+        await Message.findByIdAndDelete(messageId);
+      }
     }
 
     res.status(200).json({ message: "Message deleted for yourself successfully" });
@@ -310,12 +345,20 @@ export const toggleReaction = async (req, res) => {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    // Verify user is sender or receiver
-    if (
-      message.senderId.toString() !== userId.toString() &&
-      message.receiverId.toString() !== userId.toString()
-    ) {
-      return res.status(403).json({ message: "Unauthorized to react to this message" });
+    // Verify user is sender or receiver (or group member)
+    if (message.groupId) {
+      const group = await Group.findById(message.groupId);
+      const isMember = group ? group.members.some((mId) => mId.toString() === userId.toString()) : false;
+      if (!isMember) {
+        return res.status(403).json({ message: "Unauthorized to react to this message" });
+      }
+    } else {
+      if (
+        message.senderId.toString() !== userId.toString() &&
+        (!message.receiverId || message.receiverId.toString() !== userId.toString())
+      ) {
+        return res.status(403).json({ message: "Unauthorized to react to this message" });
+      }
     }
 
     // Check if the user already reacted
@@ -339,20 +382,31 @@ export const toggleReaction = async (req, res) => {
 
     await message.save();
 
-    // Emit socket event to both sender and receiver
-    const receiverSocketId = getReceiverSocketId(message.receiverId);
-    const senderSocketId = getReceiverSocketId(message.senderId);
-
     const reactionPayload = {
       messageId,
       reactions: message.reactions,
     };
 
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("messageReactionUpdate", reactionPayload);
-    }
-    if (senderSocketId) {
-      io.to(senderSocketId).emit("messageReactionUpdate", reactionPayload);
+    // Emit socket event to all group members or 1v1 receiver/sender
+    if (message.groupId) {
+      const group = await Group.findById(message.groupId);
+      if (group) {
+        group.members.forEach((memberId) => {
+          const socketId = getReceiverSocketId(memberId);
+          if (socketId) {
+            io.to(socketId).emit("messageReactionUpdate", reactionPayload);
+          }
+        });
+      }
+    } else {
+      const receiverSocketId = getReceiverSocketId(message.receiverId);
+      const senderSocketId = getReceiverSocketId(message.senderId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("messageReactionUpdate", reactionPayload);
+      }
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageReactionUpdate", reactionPayload);
+      }
     }
 
     res.status(200).json(message);
