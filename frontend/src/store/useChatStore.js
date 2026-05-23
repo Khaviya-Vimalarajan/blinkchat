@@ -4,16 +4,12 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 
 // Pre-load a reusable Audio instance for notification sounds.
-// Reusing one instance (instead of creating new Audio() each time) lets us
-// "unlock" it once on the first user interaction, so subsequent plays work
-// even if the page was reloaded and no gesture has occurred yet.
 const notificationSound = new Audio("/sounds/notification.mp3");
 notificationSound.preload = "auto";
 let audioUnlocked = false;
 
 function unlockAudio() {
   if (audioUnlocked) return;
-  // A silent play+pause "unlocks" the Audio element for future use
   const p = notificationSound.play();
   if (p) {
     p.then(() => {
@@ -43,14 +39,16 @@ function playNotificationSound() {
 export const useChatStore = create((set, get) => ({
   allContacts: [],
   chats: [],
+  groups: [],
   messages: [],
   activeTab: "chats",
   selectedUser: null,
   isUsersLoading: false,
+  isGroupsLoading: false,
   isMessagesLoading: false,
   blinkMode: localStorage.getItem("blinkMode") !== null
     ? JSON.parse(localStorage.getItem("blinkMode"))
-    : "off", // "off", 5, 10
+    : "off",
   isSoundEnabled: localStorage.getItem("isSoundEnabled") !== null 
     ? JSON.parse(localStorage.getItem("isSoundEnabled")) 
     : true,
@@ -78,6 +76,7 @@ export const useChatStore = create((set, get) => ({
       set({ isUsersLoading: false });
     }
   },
+  
   getMyChatPartners: async () => {
     set({ isUsersLoading: true });
     try {
@@ -90,17 +89,55 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getMessagesByUserId: async (userId) => {
+  getMyGroups: async () => {
+    set({ isGroupsLoading: true });
+    try {
+      const res = await axiosInstance.get("/groups");
+      set({ groups: res.data.groups });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load groups");
+    } finally {
+      set({ isGroupsLoading: false });
+    }
+  },
+
+  createGroup: async (groupData) => {
+    try {
+      const res = await axiosInstance.post("/groups", groupData);
+      toast.success("Group created successfully!");
+      await get().getMyGroups();
+      set({ selectedUser: { ...res.data, isGroup: true } });
+      set({ activeTab: "groups" });
+      return res.data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to create group");
+      throw error;
+    }
+  },
+
+  getMessagesByUserId: async (id) => {
     set({ isMessagesLoading: true });
     try {
-      const res = await axiosInstance.get(`/messages/${userId}`);
+      const selected = get().selectedUser;
+      const isGroup = selected && selected.isGroup;
+      const url = isGroup ? `/groups/${id}/messages` : `/messages/${id}`;
+      const res = await axiosInstance.get(url);
       set({ messages: res.data });
-      // Instantly clear the unreadCount badge for this partner locally
-      set({
-        chats: get().chats.map((c) =>
-          c._id === userId ? { ...c, unreadCount: 0 } : c
-        ),
-      });
+      
+      // Clear unreadCount badge locally after fetching messages
+      if (isGroup) {
+        set({
+          groups: get().groups.map((g) =>
+            g._id === id ? { ...g, unreadCount: 0 } : g
+          ),
+        });
+      } else {
+        set({
+          chats: get().chats.map((c) =>
+            c._id === id ? { ...c, unreadCount: 0 } : c
+          ),
+        });
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Something went wrong");
     } finally {
@@ -110,7 +147,9 @@ export const useChatStore = create((set, get) => ({
 
   sendMessage: async (messageData, receiverId = null) => {
     const targetUser = receiverId 
-      ? (get().allContacts.find((c) => c._id === receiverId) || get().chats.find((c) => c._id === receiverId))
+      ? (get().allContacts.find((c) => c._id === receiverId) || 
+         get().chats.find((c) => c._id === receiverId) ||
+         get().groups.find((g) => g._id === receiverId))
       : get().selectedUser;
       
     if (!targetUser) return;
@@ -118,8 +157,9 @@ export const useChatStore = create((set, get) => ({
     const { authUser } = useAuthStore.getState();
     const tempId = `temp-${Date.now()}`;
     
-    const isBlink = blinkMode !== "off";
-    const blinkDuration = blinkMode === "off" ? 5 : parseInt(blinkMode, 10);
+    const isGroup = !!targetUser.isGroup;
+    const isBlink = isGroup ? false : (blinkMode !== "off");
+    const blinkDuration = isGroup ? 5 : (blinkMode === "off" ? 5 : parseInt(blinkMode, 10));
     
     const payload = {
       ...messageData,
@@ -129,8 +169,13 @@ export const useChatStore = create((set, get) => ({
 
     const optimisticMessage = {
       _id: tempId,
-      senderId: authUser._id,
-      receiverId: targetUser._id,
+      senderId: {
+        _id: authUser._id,
+        fullName: authUser.fullName,
+        profilePic: authUser.profilePic,
+      },
+      receiverId: isGroup ? null : targetUser._id,
+      groupId: isGroup ? targetUser._id : null,
       text: messageData.text,
       image: messageData.image,
       isBlink,
@@ -144,12 +189,18 @@ export const useChatStore = create((set, get) => ({
     if (isCurrentChat) {
       set({ messages: [...messages, optimisticMessage] });
     }
+    
     try {
-      const res = await axiosInstance.post(`/messages/send/${targetUser._id}`, payload);
+      const url = isGroup ? `/groups/${targetUser._id}/send` : `/messages/send/${targetUser._id}`;
+      const res = await axiosInstance.post(url, payload);
       if (isCurrentChat) {
         set({ messages: get().messages.map(m => m._id === tempId ? res.data : m) });
       }
-      get().getMyChatPartners(); // Update sidebar list!
+      if (isGroup) {
+        await get().getMyGroups();
+      } else {
+        await get().getMyChatPartners();
+      }
     } catch (error) {
       if (isCurrentChat) {
         set({ messages: get().messages.filter(m => m._id !== tempId) });
@@ -160,11 +211,19 @@ export const useChatStore = create((set, get) => ({
 
   deleteMessage: async (messageId) => {
     set({ messages: get().messages.filter((msg) => msg._id !== messageId) });
+    if (typeof messageId === 'string' && messageId.startsWith('temp-')) {
+      return;
+    }
     try {
       await axiosInstance.delete(`/messages/${messageId}`);
-      get().getMyChatPartners(); // Update sidebar list!
+      await get().getMyChatPartners();
+      await get().getMyGroups();
     } catch (error) {
-      console.warn("Failed to delete message for everyone on server:", error.message);
+      if (error.response && error.response.status === 404) {
+        console.warn('Message already deleted on server, ignored.');
+      } else {
+        console.warn('Failed to delete message for everyone on server:', error.message);
+      }
     }
   },
 
@@ -172,7 +231,8 @@ export const useChatStore = create((set, get) => ({
     set({ messages: get().messages.filter((msg) => msg._id !== messageId) });
     try {
       await axiosInstance.delete(`/messages/${messageId}/myself`);
-      get().getMyChatPartners(); // Update sidebar list!
+      await get().getMyChatPartners();
+      await get().getMyGroups();
     } catch (error) {
       console.warn("Failed to delete message for myself on server:", error.message);
     }
@@ -213,37 +273,56 @@ export const useChatStore = create((set, get) => ({
     socket.off("newMessage");
     socket.on("newMessage", (newMessage) => {
       const selectedUser = get().selectedUser;
-      const isChattingWithSender = selectedUser && newMessage.senderId === selectedUser._id;
+      const isGroupMsg = !!newMessage.groupId;
+      const isGroupChat = selectedUser && selectedUser.isGroup;
+      const loggedInUserId = useAuthStore.getState().authUser?._id;
+      
+      // Don't show notification for own messages
+      const isOwnMessage = newMessage.senderId?._id === loggedInUserId || 
+                          newMessage.senderId === loggedInUserId;
+      
+      // Check if current chat is the one receiving the message
+      const isCurrentChat = isGroupMsg
+        ? (isGroupChat && selectedUser?._id === newMessage.groupId)
+        : (!isGroupMsg && !isGroupChat && selectedUser && 
+           (newMessage.senderId?._id || newMessage.senderId) === selectedUser._id);
+      
       const isTabFocused = document.hasFocus();
       const isTabActive = !document.hidden && isTabFocused;
+      const { isSoundEnabled } = get();
 
-      // Always play notification sound for the receiver on any incoming message
-      if (get().isSoundEnabled) {
+      // Play notification sound if enabled and not own message
+      if (isSoundEnabled && !isOwnMessage) {
         playNotificationSound();
       }
 
-      // Hide content in notifications for disappearing messages to preserve privacy
+      // Prepare notification content
       const notificationBody = newMessage.isBlink
         ? "⚡ Sent a disappearing message"
         : (newMessage.text || "📷 Image");
 
-      if (!isChattingWithSender || !isTabActive) {
-        // Trigger notifications
-        const senderContact = get().allContacts.find((c) => c._id === newMessage.senderId) || 
-                              get().chats.find((c) => c._id === newMessage.senderId);
-        const senderName = senderContact ? senderContact.fullName : "New message";
+      let senderName = "New message";
+      if (isGroupMsg) {
+        const senderFullName = newMessage.senderId?.fullName || "Someone";
+        const group = get().groups.find((g) => g._id === newMessage.groupId);
+        const groupName = group ? group.name : "Group";
+        senderName = `${groupName} - ${senderFullName}`;
+      } else {
+        const senderIdStr = newMessage.senderId?._id || newMessage.senderId;
+        const senderContact = get().allContacts.find((c) => c._id === senderIdStr) || 
+                              get().chats.find((c) => c._id === senderIdStr);
+        senderName = senderContact ? senderContact.fullName : "Someone";
+      }
 
-        // Show in-app toast only if they are not active in that specific chat
-        if (!isChattingWithSender) {
-          toast(`${senderName}: ${notificationBody}`, {
-            icon: "💬",
-            duration: 3500,
-          });
-          // Refetch chat list to update order/states
-          get().getMyChatPartners();
-        }
+      // Show notifications only if not currently viewing the chat and not own message
+      if (!isCurrentChat && !isOwnMessage) {
+        // Show toast notification
+        toast(`${senderName}: ${notificationBody}`, {
+          icon: isGroupMsg ? "👥" : "💬",
+          duration: 3500,
+        });
 
-        // Update document title for visual alert if not focused
+        // Update document title for visual alert
         if (!isTabFocused || document.hidden) {
           const originalTitle = document.title;
           if (!originalTitle.startsWith("💬")) {
@@ -256,31 +335,34 @@ export const useChatStore = create((set, get) => ({
           }
         }
 
-        // Always show desktop notification if document is hidden/unfocused and permission is granted
+        // Desktop notification for background tab/window
         if ((document.hidden || !isTabFocused) && Notification.permission === "granted") {
           new Notification(senderName, {
             body: notificationBody,
-            icon: senderContact?.profilePic || "/avatar.png",
+            icon: isGroupMsg ? "/group-avatar.png" : (newMessage.senderId?.profilePic || "/avatar.png"),
+            tag: isGroupMsg ? `group-${newMessage.groupId}` : `user-${newMessage.senderId}`,
           });
         }
       }
 
-      if (isChattingWithSender) {
+      // Update messages if we're in the current chat
+      if (isCurrentChat) {
         set({ messages: [...get().messages, newMessage] });
+      }
 
-        if (!newMessage.isBlink) {
-          socket.emit("markAsSeen", {
-            messageId: newMessage._id,
-            senderId: selectedUser._id,
-          });
-        }
+      // Always refresh the appropriate sidebar list to update unread counts
+      if (isGroupMsg) {
+        get().getMyGroups();
+      } else {
+        get().getMyChatPartners();
       }
     });
 
     socket.off("messageDeleted");
     socket.on("messageDeleted", (messageId) => {
       set({ messages: get().messages.filter((msg) => msg._id !== messageId) });
-      get().getMyChatPartners(); // Update sidebar list!
+      get().getMyChatPartners();
+      get().getMyGroups();
     });
 
     socket.off("messagesSeen");
@@ -288,14 +370,9 @@ export const useChatStore = create((set, get) => ({
       const selectedUser = get().selectedUser;
       if (selectedUser && selectedUser._id === receiverId) {
         const updatedMessages = get().messages.map((msg) => {
-          // If a specific blink message was seen, update it
           if (messageId && msg._id === messageId) {
             return { ...msg, isSeen: true, seenAt };
           }
-          // Skip blink messages — their seen status is managed individually
-          // via the "Reveal" button + markMessageAsSeen API, not bulk updates.
-          // Without this guard, opening a chat would start the blink countdown
-          // on the sender side before the receiver actually reveals the message.
           if (msg.isBlink) return msg;
           if (msg.senderId === senderId && msg.receiverId === receiverId && !msg.isSeen) {
             return { ...msg, isSeen: true, seenAt };
@@ -305,6 +382,22 @@ export const useChatStore = create((set, get) => ({
         set({ messages: updatedMessages });
       }
     });
+    
+     socket.off("groupUpdated");
+     socket.on("groupUpdated", ({ groupId, updatedGroup }) => {
+
+        set({
+         groups: get().groups.map(group =>
+          group._id === groupId ? { ...updatedGroup, isGroup: true } : group
+       )
+    });
+  
+  
+    const selectedUser = get().selectedUser;
+    if (selectedUser && selectedUser.isGroup && selectedUser._id === groupId) {
+    set({ selectedUser: { ...updatedGroup, isGroup: true } });
+   }
+   });
 
     socket.off("messageReactionUpdate");
     socket.on("messageReactionUpdate", ({ messageId, reactions }) => {
@@ -324,5 +417,4 @@ export const useChatStore = create((set, get) => ({
     socket.off("messagesSeen");
     socket.off("messageReactionUpdate");
   },
-
 }));

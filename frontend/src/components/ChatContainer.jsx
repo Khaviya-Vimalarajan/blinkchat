@@ -89,7 +89,7 @@ function BlinkMessage({
     return null;
   }
 
-  const isSender = msg.senderId === authUser._id;
+  const isSender = (msg.senderId?._id || msg.senderId) === authUser._id;
 
   const handleReveal = async () => {
     if (isRevealing || msg.isSeen) return;
@@ -114,7 +114,7 @@ function BlinkMessage({
           <img 
             src={isSender 
               ? authUser.profilePic || "/avatar.png" 
-              : selectedUser.profilePic || "/avatar.png"} 
+              : (msg.senderId?.profilePic || selectedUser.profilePic || "/avatar.png")} 
             alt="Avatar" 
             className="object-cover"
           />
@@ -122,6 +122,11 @@ function BlinkMessage({
       </div>
       
       <div className="chat-header mb-1 flex items-center gap-1.5">
+        {!isSender && selectedUser.isGroup && (
+          <span className="text-xs font-bold text-pink-400 mr-1.5 bg-purple-900/40 px-1.5 py-0.5 rounded">
+            {msg.senderId?.fullName || "Someone"}
+          </span>
+        )}
         <time className="text-xs text-purple-400 opacity-80 px-1">
           {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </time>
@@ -227,7 +232,10 @@ function BlinkMessage({
                 <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
                   {msg.reactions.map((r, idx) => {
                     const isMe = r.userId === authUser._id;
-                    const name = isMe ? "You" : ((allContacts && allContacts.find((u) => u._id === r.userId)) || selectedUser).fullName;
+                    const member = (allContacts && allContacts.find((u) => u._id === r.userId)) || 
+                                   (selectedUser.members && selectedUser.members.find((u) => u._id === r.userId)) || 
+                                   selectedUser;
+                    const name = isMe ? "You" : (member.fullName || member.name || "Someone");
                     return (
                       <div key={idx} className="flex items-center justify-between gap-3 py-0.5 hover:bg-purple-900/40 px-1 rounded transition-colors">
                         <span className="text-purple-200 font-medium">{name}</span>
@@ -483,7 +491,7 @@ function ChatContainer() {
         ) : isMessagesLoading ? (
           <MessagesLoadingSkeleton />
         ) : (
-          <NoChatHistoryPlaceholder name={selectedUser.fullName} />
+          <NoChatHistoryPlaceholder name={selectedUser.isGroup ? selectedUser.name : selectedUser.fullName} />
         )}
       </div>
 
@@ -609,7 +617,12 @@ function ChatContainer() {
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
               {reactionDetailMessage.reactions.map((react, idx) => {
                 const isMe = react.userId === authUser._id;
-                const user = isMe ? authUser : ((allContacts && allContacts.find((u) => u._id === react.userId)) || selectedUser);
+                const user = isMe 
+                  ? authUser 
+                  : ((allContacts && allContacts.find((u) => u._id === react.userId)) || 
+                     (selectedUser.members && selectedUser.members.find((u) => u._id === react.userId)) || 
+                     selectedUser);
+                const displayName = user.fullName || user.name || "Someone";
                 return (
                   <div
                     key={idx}
@@ -617,13 +630,13 @@ function ChatContainer() {
                   >
                     <div className="flex items-center gap-3">
                       <img
-                        src={user.profilePic || "/avatar.png"}
-                        alt={user.fullName}
+                        src={user.profilePic || user.avatar || "/avatar.png"}
+                        alt={displayName}
                         className="w-9 h-9 rounded-full object-cover border border-purple-800"
                       />
                       <div className="flex flex-col">
                         <span className="text-xs font-semibold text-purple-100">
-                          {isMe ? `${user.fullName} (You)` : user.fullName}
+                          {isMe ? `${displayName} (You)` : displayName}
                         </span>
                         <span className="text-[10px] text-purple-400">
                           {isMe ? "Sent a reaction" : "Reacted to your message"}
