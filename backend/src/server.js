@@ -25,6 +25,9 @@ const allowedOrigins = [
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
+    if (ENV.NODE_ENV !== "production") {
+      return callback(null, true);
+    }
     if (allowedOrigins.indexOf(origin) !== -1 || origin.startsWith("http://localhost:")) {
       return callback(null, true);
     }

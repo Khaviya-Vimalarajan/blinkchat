@@ -1,12 +1,14 @@
-import { XIcon, Zap } from "lucide-react";
+import { XIcon, Zap, Phone, Video } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
+import { useCallStore } from "../store/useCallStore";
 import { useEffect } from "react";
 import toast from "react-hot-toast";
 
 function ChatHeader() {
   const { selectedUser, setSelectedUser, blinkMode, setBlinkMode } = useChatStore();
   const { onlineUsers } = useAuthStore();
+  const { initiateCall } = useCallStore();
   
   const isGroup = selectedUser && selectedUser.isGroup;
   const isOnline = !isGroup && onlineUsers.includes(selectedUser._id);
@@ -45,6 +47,14 @@ function ChatHeader() {
       setBlinkMode("off");
       toast("Blink Mode disabled", { icon: "📴" });
     }
+  };
+
+  const handleStartCall = (type) => {
+    if (!isOnline) {
+      toast.error(`${selectedUser.fullName} is offline. You can only call online contacts.`);
+      return;
+    }
+    initiateCall(selectedUser, type);
   };
 
   const displayName = isGroup ? selectedUser.name : selectedUser.fullName;
@@ -92,9 +102,29 @@ function ChatHeader() {
           </button>
         )}
 
+        {/* Call Buttons */}
+        {!isGroup && (
+          <>
+            <button
+              onClick={() => handleStartCall("audio")}
+              className="p-2 rounded-full hover:bg-purple-900/80 text-purple-400 hover:text-emerald-400 transition-all duration-200 cursor-pointer"
+              title="Voice Call"
+            >
+              <Phone className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => handleStartCall("video")}
+              className="p-2 rounded-full hover:bg-purple-900/80 text-purple-400 hover:text-pink-400 transition-all duration-200 cursor-pointer"
+              title="Video Call"
+            >
+              <Video className="w-5 h-5" />
+            </button>
+          </>
+        )}
+
         <button 
           onClick={() => setSelectedUser(null)}
-          className="p-2 rounded-full hover:bg-purple-900/80 text-purple-400 hover:text-purple-100 transition-all duration-200"
+          className="p-2 rounded-full hover:bg-purple-900/80 text-purple-400 hover:text-white transition-all duration-200"
         >
           <XIcon className="w-5 h-5" />
         </button>
