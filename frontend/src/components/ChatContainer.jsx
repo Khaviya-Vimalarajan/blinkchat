@@ -19,6 +19,7 @@ function BlinkMessage({
   onForward,
   onShowReactionDetails,
   allContacts = [],
+  onStickerClick,
 }) {
   const [timeLeft, setTimeLeft] = useState(null);
   const [isRevealing, setIsRevealing] = useState(false);
@@ -90,6 +91,7 @@ function BlinkMessage({
   }
 
   const isSender = (msg.senderId?._id || msg.senderId) === authUser._id;
+  const isSticker = msg.text === "[Sticker]" && msg.image;
 
   const handleReveal = async () => {
     if (isRevealing || msg.isSeen) return;
@@ -182,21 +184,34 @@ function BlinkMessage({
           ref={bubbleRef}
           onMouseLeave={handleMouseLeave}
           className={`chat-bubble flex flex-col relative group/bubble ${
-            isSender
+            isSticker
+              ? "bg-transparent shadow-none p-0 overflow-visible"
+              : isSender
               ? "bg-purple-500 text-white shadow-sm"
               : "bg-purple-800 text-purple-50 shadow-sm"
-          } ${msg.image && !msg.text ? "p-1.5 bg-purple-500/80" : ""} ${
+          } ${msg.image && !msg.text && !isSticker ? "p-1.5 bg-purple-500/80" : ""} ${
             msg.isBlink ? "border border-pink-500/40" : ""
           }`}
         >
-          {msg.image && (
-            <img 
-              src={msg.image} 
-              alt="Attachment" 
-              className="sm:max-w-[220px] rounded-lg object-cover" 
+          {isSticker ? (
+            <img
+              src={msg.image}
+              alt="Sticker"
+              onClick={() => !msg.isBlink && onStickerClick && onStickerClick(msg.image)}
+              className="w-32 h-32 object-contain select-none hover:scale-110 active:scale-95 transition-transform duration-200 cursor-pointer drop-shadow-[0_0_12px_rgba(168,85,247,0.45)] hover:drop-shadow-[0_0_18px_rgba(236,72,153,0.65)]"
             />
+          ) : (
+            <>
+              {msg.image && (
+                <img 
+                  src={msg.image} 
+                  alt="Attachment" 
+                  className="sm:max-w-[220px] rounded-lg object-cover" 
+                />
+              )}
+              {msg.text && <p className={`leading-relaxed ${msg.image ? "mt-2" : ""}`}>{msg.text}</p>}
+            </>
           )}
-          {msg.text && <p className={`leading-relaxed ${msg.image ? "mt-2" : ""}`}>{msg.text}</p>}
 
           {msg.isBlink && (
             <div className="mt-1.5 flex items-center justify-end text-[9px] text-pink-300 font-semibold gap-1 select-none">
@@ -377,6 +392,9 @@ function ChatContainer() {
     allContacts,
     chats,
     sendMessage,
+    favoriteStickers,
+    addFavoriteSticker,
+    removeFavoriteSticker,
   } = useChatStore();
 
   const { authUser } = useAuthStore();
@@ -388,6 +406,11 @@ function ChatContainer() {
   const [selectedForwardUsers, setSelectedForwardUsers] = useState([]);
   const [forwardSearchQuery, setForwardSearchQuery] = useState("");
   const [reactionDetailMessage, setReactionDetailMessage] = useState(null);
+  const [selectedStickerForModal, setSelectedStickerForModal] = useState(null);
+
+  const handleStickerClick = (stickerUrl) => {
+    setSelectedStickerForModal(stickerUrl);
+  };
 
   const handleForwardOpen = (msg) => {
     setMessageToForward(msg);
@@ -484,6 +507,7 @@ function ChatContainer() {
                 onForward={handleForwardOpen}
                 onShowReactionDetails={setReactionDetailMessage}
                 allContacts={allContacts}
+                onStickerClick={handleStickerClick}
               />
             ))}
             <div ref={messageEndRef} />
@@ -647,6 +671,67 @@ function ChatContainer() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp-Style Sticker Action Modal */}
+      {selectedStickerForModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-purple-950/95 border border-purple-500/30 rounded-2xl w-full max-w-xs p-6 shadow-2xl relative animate-in zoom-in-95 duration-200 flex flex-col items-center">
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedStickerForModal(null)}
+              className="absolute top-3 right-3 p-1 rounded-full text-purple-400 hover:text-purple-100 hover:bg-purple-900/50 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Sticker Preview */}
+            <div className="w-32 h-32 bg-purple-900/10 border border-purple-800/20 rounded-xl p-3 flex items-center justify-center mb-6 drop-shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+              <img
+                src={selectedStickerForModal}
+                alt="Sticker Preview"
+                className="w-full h-full object-contain select-none hover:scale-105 transition-transform duration-200"
+              />
+            </div>
+
+            {/* Title / Description */}
+            <h4 className="text-purple-100 font-semibold text-sm select-none">Sticker Options</h4>
+            <p className="text-[10px] text-purple-400 mt-1 mb-6 text-center select-none">
+              Would you like to save this sticker to your collection?
+            </p>
+
+            {/* Actions */}
+            <div className="w-full flex flex-col gap-2">
+              {favoriteStickers.includes(selectedStickerForModal) ? (
+                <button
+                  onClick={() => {
+                    removeFavoriteSticker(selectedStickerForModal);
+                    setSelectedStickerForModal(null);
+                  }}
+                  className="w-full py-2 rounded-xl bg-red-950/45 hover:bg-red-900 border border-red-800 text-red-200 text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Remove from Stickers
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    addFavoriteSticker(selectedStickerForModal);
+                    setSelectedStickerForModal(null);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Add to Stickers ⭐
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedStickerForModal(null)}
+                className="w-full py-2 rounded-xl text-purple-400 hover:text-purple-100 hover:bg-purple-900/30 transition-all text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
