@@ -1,5 +1,6 @@
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
+import { useCallStore } from "../store/useCallStore";
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
 import ProfileHeader from "../components/ProfileHeader";
 import ActiveTabSwitch from "../components/ActiveTabSwitch";
@@ -8,11 +9,14 @@ import ContactList from "../components/ContactList";
 import GroupsList from "../components/GroupsList";
 import ChatContainer from "../components/ChatContainer";
 import NoConversationPlaceholder from "../components/NoConversationPlaceholder";
+import IncomingCallModal from "../components/IncomingCallModal";
+import ActiveCallScreen from "../components/ActiveCallScreen";
 import { useEffect } from "react";
 
 function ChatPage() {
   const { activeTab, selectedUser, subscribeToMessages, unsubscribeFromMessages, getAllContacts } = useChatStore();
   const { socket } = useAuthStore();
+  const { subscribeToCalls, unsubscribeFromCalls, cleanup: cleanupCall } = useCallStore();
 
   useEffect(() => {
     getAllContacts();
@@ -21,6 +25,18 @@ function ChatPage() {
       unsubscribeFromMessages();
     };
   }, [subscribeToMessages, unsubscribeFromMessages, getAllContacts, socket]);
+
+  useEffect(() => {
+    if (socket) {
+      subscribeToCalls(socket);
+    }
+    return () => {
+      if (socket) {
+        unsubscribeFromCalls(socket);
+      }
+      cleanupCall();
+    };
+  }, [socket, subscribeToCalls, unsubscribeFromCalls, cleanupCall]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -64,6 +80,10 @@ function ChatPage() {
           {selectedUser ? <ChatContainer /> : <NoConversationPlaceholder />}
         </div>
       </BorderAnimatedContainer>
+
+      {/* Global Call Overlays */}
+      <IncomingCallModal />
+      <ActiveCallScreen />
     </div>
   );
 }
