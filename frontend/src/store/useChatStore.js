@@ -52,10 +52,30 @@ export const useChatStore = create((set, get) => ({
   isSoundEnabled: localStorage.getItem("isSoundEnabled") !== null 
     ? JSON.parse(localStorage.getItem("isSoundEnabled")) 
     : true,
+  favoriteStickers: localStorage.getItem("favoriteStickers") !== null
+    ? JSON.parse(localStorage.getItem("favoriteStickers"))
+    : [],
 
   toggleSound: () => {
     localStorage.setItem("isSoundEnabled", !get().isSoundEnabled);
     set({ isSoundEnabled: !get().isSoundEnabled });
+  },
+
+  addFavoriteSticker: (stickerUrl) => {
+    const current = get().favoriteStickers;
+    if (current.includes(stickerUrl)) return;
+    const updated = [...current, stickerUrl];
+    localStorage.setItem("favoriteStickers", JSON.stringify(updated));
+    set({ favoriteStickers: updated });
+    toast.success("Added to Stickers!", { icon: "⭐" });
+  },
+
+  removeFavoriteSticker: (stickerUrl) => {
+    const current = get().favoriteStickers;
+    const updated = current.filter((url) => url !== stickerUrl);
+    localStorage.setItem("favoriteStickers", JSON.stringify(updated));
+    set({ favoriteStickers: updated });
+    toast.success("Removed from Stickers!", { icon: "🗑️" });
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),

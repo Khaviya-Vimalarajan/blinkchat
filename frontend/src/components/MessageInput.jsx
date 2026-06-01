@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import useKeyboardSound from "../hooks/useKeyboardSound";
-import { Image, Send, X, Zap } from "lucide-react";
+import { Image, Send, Smile, X, Zap } from "lucide-react";
 import toast from "react-hot-toast";
+import EmojiStickerPicker from "./EmojiStickerPicker";
 
 const MessageInput = () => {
   const [text, setText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
+  const [showPicker, setShowPicker] = useState(false);
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
   const { sendMessage, isSoundEnabled, blinkMode, setBlinkMode } = useChatStore();
   const { playRandomKeyStrokeSound } = useKeyboardSound();
 
@@ -70,6 +73,37 @@ const MessageInput = () => {
     }
   };
 
+  const handleSelectEmoji = (emoji) => {
+    if (!inputRef.current) return;
+    const input = inputRef.current;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+    const newText = before + emoji + after;
+    setText(newText);
+
+    // Refocus input and position cursor after emoji
+    setTimeout(() => {
+      input.focus();
+      input.setSelectionRange(start + emoji.length, start + emoji.length);
+    }, 0);
+  };
+
+  const handleSelectSticker = async (stickerDataUrl) => {
+    if (!stickerDataUrl) return;
+    setShowPicker(false);
+
+    try {
+      await sendMessage({
+        text: "[Sticker]",
+        image: stickerDataUrl,
+      });
+    } catch (error) {
+      console.error("Failed to send sticker:", error);
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!navigator.onLine) {
@@ -96,7 +130,15 @@ const MessageInput = () => {
   };
 
   return (
-    <div className="p-4 w-full bg-purple-950/50 backdrop-blur-md border-t border-purple-900/50">
+    <div className="p-4 w-full bg-purple-950/50 backdrop-blur-md border-t border-purple-900/50 relative">
+      {showPicker && (
+        <EmojiStickerPicker
+          onSelectEmoji={handleSelectEmoji}
+          onSelectSticker={handleSelectSticker}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
+
       {imagePreview && (
         <div className="mb-3 flex items-center gap-2">
           <div className="relative">
@@ -126,6 +168,7 @@ const MessageInput = () => {
         }`}>
           <input
             type="text"
+            ref={inputRef}
             className="w-full bg-transparent text-purple-100 text-sm focus:outline-none placeholder:text-purple-400/50 disabled:opacity-40 disabled:cursor-not-allowed"
             placeholder={!isOnline ? "You are offline. Waiting for connection..." : blinkMode !== "off" ? `Send a disappearing message (${blinkMode}s)...` : "Type a message..."}
             value={text}
@@ -144,6 +187,21 @@ const MessageInput = () => {
             disabled={!isOnline}
           />
           
+          {/* Emojis & Stickers Trigger */}
+          <button
+            type="button"
+            className={`p-1.5 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+              showPicker 
+                ? "text-pink-400 bg-pink-500/10" 
+                : "text-purple-400 hover:bg-purple-800/80"
+            }`}
+            onClick={() => setShowPicker(!showPicker)}
+            disabled={!isOnline}
+            title={!isOnline ? "Unavailable offline" : "Emojis & Stickers"}
+          >
+            <Smile size={18} />
+          </button>
+
           {/* Blink Mode Toggle */}
           <button
             type="button"
